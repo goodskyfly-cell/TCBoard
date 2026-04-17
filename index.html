@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>籃球戰術板 Pro - 語音一體化版</title>
+    <title>籃球戰術板 Pro - 語音視覺強化版</title>
     <style>
         :root { 
             --panel: rgba(25, 25, 25, 0.98); 
@@ -27,30 +27,35 @@
         #drawingCanvas { z-index: 10; pointer-events: none; }
         #drawingCanvas.active { pointer-events: auto; cursor: crosshair; }
         
-        /* 核心修正：一體化語音面板 */
+        /* 核心修正：語音面板視覺優化 */
         .voice-control-panel {
-            position: absolute; min-width: 180px; max-width: 300px; height: 54px;
-            background: rgba(45, 55, 72, 0.95); border-radius: 27px;
-            display: flex; align-items: center; padding: 0 5px;
+            position: absolute; min-width: 220px; max-width: 400px; height: 66px;
+            background: rgba(45, 55, 72, 0.95); border-radius: 33px;
+            display: flex; align-items: center; padding: 0 8px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 15000;
             cursor: move; touch-action: none; border: 2px solid var(--border);
             transition: background 0.3s, border-color 0.3s;
         }
         .voice-mic-icon {
-            width: 44px; height: 44px; background: var(--accent-purple);
+            width: 50px; height: 50px; background: var(--accent-purple);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-size: 20px; flex-shrink: 0; transition: 0.3s;
+            font-size: 24px; flex-shrink: 0; transition: 0.3s;
         }
         .voice-text-area {
-            flex: 1; padding: 0 15px; font-size: 14px; color: #edf2f7;
+            flex: 1; padding: 0 20px; 
+            font-size: 21px; /* 修正3：字體加大1.5倍 (原本14px * 1.5 = 21px) */
+            color: #edf2f7;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             pointer-events: none;
+            direction: rtl; /* 修正2：文字由右至左顯示 */
+            text-align: right;
         }
         .recording .voice-mic-icon { background: var(--accent-red); animation: voice-pulse 1.2s infinite; }
         .recording { border-color: var(--accent-red); background: rgba(100, 30, 30, 0.95); }
 
         @keyframes voice-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
+        /* 其餘功能樣式保留 */
         .sidebar { position: absolute; top: 0; height: 100%; background: var(--panel); transition: 0.3s ease; z-index: 4000; width: 260px; display: flex; flex-direction: column; }
         .sidebar-left { left: -260px; border-right: 1px solid var(--border); }
         .sidebar-right { right: -260px; border-left: 1px solid var(--border); }
@@ -61,7 +66,6 @@
         .tab { position: absolute; width: 42px; height: 100px; display: flex; align-items: center; justify-content: center; writing-mode: vertical-lr; cursor: pointer; color: white; font-weight: bold; top: 20%; z-index: 4001; }
         .left-tab { right: -42px; background: var(--accent-blue); border-radius: 0 10px 10px 0; }
         .right-tab { left: -42px; background: var(--accent-green); border-radius: 10px 0 0 10px; }
-
         .panel-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .btn-green { background: var(--accent-green); }
         .btn-blue { background: var(--accent-blue); }
@@ -71,17 +75,12 @@
         .btn-orange { background: var(--accent-orange); }
         .tool-active { outline: 2px solid white; background: var(--accent-purple) !important; }
         .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-
-        .play-controls-wrapper { 
-            position: absolute; bottom: -250px; left: 50%; transform: translateX(-50%); z-index: 10000; 
-            display: flex; flex-direction: column; align-items: center; gap: 12px; transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-        }
+        .play-controls-wrapper { position: absolute; bottom: -250px; left: 50%; transform: translateX(-50%); z-index: 10000; display: flex; flex-direction: column; align-items: center; gap: 12px; transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .play-controls-wrapper.active { bottom: 30px; }
         .speed-panel { background: rgba(0, 0, 0, 0.85); padding: 8px 20px; border-radius: 30px; display: flex; align-items: center; gap: 12px; font-size: 14px; border: 1px solid var(--border); box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .speed-slider { cursor: pointer; accent-color: #3182ce; width: 120px; }
         .play-bar { background: rgba(0, 0, 0, 0.85); padding: 12px 25px; border-radius: 50px; display: flex; align-items: center; gap: 20px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
         .ctrl-btn { border: none; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-
         .tactic-item { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .tactic-name { font-size: 13px; font-weight: bold; color: #e2e8f0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     </style>
@@ -170,7 +169,7 @@
     let pauseTime = 500; 
     let savedTactics = [];
 
-    // --- 修改後的語音一體化與拖曳邏輯 ---
+    // --- 修改後的即時語音辨識邏輯 ---
     let recognition;
     let isRecording = false;
 
@@ -178,25 +177,28 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) return;
         recognition = new SpeechRecognition();
-        recognition.lang = 'zh-TW'; recognition.continuous = false; recognition.interimResults = false;
+        recognition.lang = 'zh-TW'; 
+        recognition.continuous = true; 
+        recognition.interimResults = true; // 修正1：開啟即時辨識功能
         
         recognition.onstart = () => {
             isRecording = true;
             document.getElementById('voicePanel').classList.add('recording');
-            document.getElementById('voiceText').innerText = "請說話...";
+            document.getElementById('voiceText').innerText = "辨識中...";
         };
 
         recognition.onresult = (e) => {
-            const text = e.results[0][0].transcript;
-            document.getElementById('voiceText').innerText = text;
+            // 修正1：抓取即時結果並立即更新
+            let interimTranscript = '';
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                interimTranscript += e.results[i][0].transcript;
+            }
+            document.getElementById('voiceText').innerText = interimTranscript;
         };
 
         recognition.onend = () => {
             isRecording = false;
             document.getElementById('voicePanel').classList.remove('recording');
-            if(document.getElementById('voiceText').innerText === "請說話...") {
-                document.getElementById('voiceText').innerText = "點擊語音輸入...";
-            }
         };
     }
 
@@ -212,10 +214,8 @@
 
         const start = (e) => { 
             const pos = e.touches ? e.touches[0] : e;
-            x = pos.clientX - panel.offsetLeft;
-            y = pos.clientY - panel.offsetTop;
-            isDragging = true;
-            hasMoved = false;
+            x = pos.clientX - panel.offsetLeft; y = pos.clientY - panel.offsetTop;
+            isDragging = true; hasMoved = false;
         };
 
         const move = (e) => {
@@ -224,7 +224,7 @@
             const pos = e.touches ? e.touches[0] : e;
             panel.style.left = (pos.clientX - x) + 'px';
             panel.style.top = (pos.clientY - y) + 'px';
-            panel.style.bottom = 'auto'; // 解除初始底部定位
+            panel.style.bottom = 'auto';
         };
 
         const end = () => { isDragging = false; };
@@ -236,12 +236,10 @@
         window.addEventListener('mouseup', end);
         window.addEventListener('touchend', end);
 
-        panel.addEventListener('click', () => {
-            if (!hasMoved) toggleSpeech();
-        });
+        panel.addEventListener('click', () => { if (!hasMoved) toggleSpeech(); });
     }
 
-    // --- 核心戰術板邏輯 ---
+    // --- 其餘戰術板核心邏輯保留 ---
     async function init() {
         try {
             courtImg = await loadImage("https://raw.githubusercontent.com/goodskyfly-cell/BBOARD/main/basketball%20court%202%20(NEW).png");
@@ -254,127 +252,38 @@
     }
 
     function loadImage(src) { return new Promise((res) => { const img = new Image(); img.crossOrigin = "anonymous"; img.src = src; img.onload = () => res(img); }); }
-
-    function resize() {
-        const holder = document.getElementById('canvasHolder');
-        const ratio = BASE_W / BASE_H;
-        let w = holder.clientWidth, h = holder.clientHeight;
-        if (w / h > ratio) w = h * ratio; else h = w / ratio;
-        canvas.width = dCanvas.width = w; canvas.height = dCanvas.height = h;
-        render();
-    }
-
-    function resetItems() {
-        players = []; 
-        for (let i = 0; i < 12; i++) players.push({ x: 80 + (i % 6) * 110, y: i < 6 ? 90 : 200, imgIndex: i, bindSlot: null });
-        slots = [ {x: 300, y: 480, id: 0}, {x: 400, y: 480, id: 1}, {x: 500, y: 480, id: 2}, {x: 600, y: 480, id: 3}, {x: 700, y: 480, id: 4} ];
-        ball = {x: 500, y: 286}; render();
-    }
-
+    function resize() { const holder = document.getElementById('canvasHolder'); const ratio = BASE_W / BASE_H; let w = holder.clientWidth, h = holder.clientHeight; if (w / h > ratio) w = h * ratio; else h = w / ratio; canvas.width = dCanvas.width = w; canvas.height = dCanvas.height = h; render(); }
+    function resetItems() { players = []; for (let i = 0; i < 12; i++) players.push({ x: 80 + (i % 6) * 110, y: i < 6 ? 90 : 200, imgIndex: i, bindSlot: null }); slots = [ {x: 300, y: 480, id: 0}, {x: 400, y: 480, id: 1}, {x: 500, y: 480, id: 2}, {x: 600, y: 480, id: 3}, {x: 700, y: 480, id: 4} ]; ball = {x: 500, y: 286}; render(); }
     function render() {
-        if (!courtImg) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(courtImg, 0, 0, canvas.width, canvas.height);
-        const s = canvas.width / BASE_W;
+        if (!courtImg) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(courtImg, 0, 0, canvas.width, canvas.height); const s = canvas.width / BASE_W;
         if (currentMode === 'advanced' || isPlaying) {
-            slots.forEach(sl => {
-                ctx.beginPath(); ctx.arc(sl.x * s, sl.y * s, 30 * s, 0, Math.PI * 2);
-                ctx.strokeStyle = "rgba(49, 130, 206, 0.8)"; ctx.setLineDash([5, 5]); ctx.lineWidth = 3; ctx.stroke();
-                ctx.setLineDash([]); ctx.fillStyle = "rgba(49, 130, 206, 0.15)"; ctx.fill();
-            });
+            slots.forEach(sl => { ctx.beginPath(); ctx.arc(sl.x * s, sl.y * s, 30 * s, 0, Math.PI * 2); ctx.strokeStyle = "rgba(49, 130, 206, 0.8)"; ctx.setLineDash([5, 5]); ctx.lineWidth = 3; ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = "rgba(49, 130, 206, 0.15)"; ctx.fill(); });
         }
-        players.forEach(p => {
-            const r = 25.5 * s;
-            ctx.save(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2); ctx.clip();
-            if (playerImages[p.imgIndex]) ctx.drawImage(playerImages[p.imgIndex], (p.x-25.5)*s, (p.y-25.5)*s, 51*s, 51*s);
-            ctx.restore(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2);
-            ctx.strokeStyle = (p.bindSlot !== null && currentMode === 'advanced') ? "#38a169" : "white";
-            ctx.lineWidth = 2.5; ctx.stroke();
-        });
-        const br = 18 * s; ctx.beginPath(); ctx.arc(ball.x * s, ball.y * s, br, 0, Math.PI * 2);
-        ctx.fillStyle = "#ff5722"; ctx.fill(); ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
+        players.forEach(p => { const r = 25.5 * s; ctx.save(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2); ctx.clip(); if (playerImages[p.imgIndex]) ctx.drawImage(playerImages[p.imgIndex], (p.x-25.5)*s, (p.y-25.5)*s, 51*s, 51*s); ctx.restore(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2); ctx.strokeStyle = (p.bindSlot !== null && currentMode === 'advanced') ? "#38a169" : "white"; ctx.lineWidth = 2.5; ctx.stroke(); });
+        const br = 18 * s; ctx.beginPath(); ctx.arc(ball.x * s, ball.y * s, br, 0, Math.PI * 2); ctx.fillStyle = "#ff5722"; ctx.fill(); ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
     }
 
     function setupEvents() {
         let target = null;
-        const getXY = (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const cx = e.touches ? e.touches[0].clientX : e.clientX;
-            const cy = e.touches ? e.touches[0].clientY : e.clientY;
-            const s = canvas.width / BASE_W; return { x: (cx - rect.left) / s, y: (cy - rect.top) / s };
-        };
-        const start = (e) => {
-            if (isPlaying) return;
-            const pos = getXY(e);
-            if (isDrawingMode) {
-                const s = canvas.width / BASE_W; dCtx.beginPath(); dCtx.moveTo(pos.x * s, pos.y * s);
-                dCtx.setLineDash(lineStyle === 'dashed' ? [10, 10] : []);
-                dCtx.strokeStyle = "black"; dCtx.lineWidth = 4; isDrawing = true; return;
-            }
-            const items = currentMode === 'advanced' ? [...slots, ball, ...players] : [ball, ...players];
-            target = items.reverse().find(it => Math.hypot(it.x - pos.x, it.y - pos.y) < 30);
-        };
-        const move = (e) => {
-            if (!target && !isDrawing) return; if (e.cancelable) e.preventDefault();
-            const pos = getXY(e);
-            if (isDrawingMode) { const s = canvas.width / BASE_W; dCtx.lineTo(pos.x * s, pos.y * s); dCtx.stroke(); }
-            else { 
-                target.x = pos.x; target.y = pos.y; 
-                if (currentMode === 'advanced' && players.includes(target)) {
-                    const near = slots.find(sl => Math.hypot(sl.x - pos.x, i.y - pos.y) < 40); // 修正 i.y 為 pos.y
-                    target.bindSlot = near ? near.id : null;
-                    if(near) { target.x = near.x; target.y = near.y; }
-                }
-                render(); 
-            }
-        };
+        const getXY = (e) => { const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; const s = canvas.width / BASE_W; return { x: (cx - rect.left) / s, y: (cy - rect.top) / s }; };
+        const start = (e) => { if (isPlaying) return; const pos = getXY(e); if (isDrawingMode) { const s = canvas.width / BASE_W; dCtx.beginPath(); dCtx.moveTo(pos.x * s, pos.y * s); dCtx.setLineDash(lineStyle === 'dashed' ? [10, 10] : []); dCtx.strokeStyle = "black"; dCtx.lineWidth = 4; isDrawing = true; return; } const items = currentMode === 'advanced' ? [...slots, ball, ...players] : [ball, ...players]; target = items.reverse().find(it => Math.hypot(it.x - pos.x, it.y - pos.y) < 30); };
+        const move = (e) => { if (!target && !isDrawing) return; if (e.cancelable) e.preventDefault(); const pos = getXY(e); if (isDrawingMode) { const s = canvas.width / BASE_W; dCtx.lineTo(pos.x * s, pos.y * s); dCtx.stroke(); } else { target.x = pos.x; target.y = pos.y; if (currentMode === 'advanced' && players.includes(target)) { const near = slots.find(sl => Math.hypot(sl.x - pos.x, pos.y - pos.y) < 40); target.bindSlot = near ? near.id : null; if(near) { target.x = near.x; target.y = near.y; } } render(); } };
         const end = () => { target = null; isDrawing = false; };
-        const el = document.getElementById('canvasHolder');
-        el.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
-        el.addEventListener('touchstart', start, {passive:false}); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
+        const el = document.getElementById('canvasHolder'); el.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end); el.addEventListener('touchstart', start, {passive:false}); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
     }
 
-    function record() {
-        frames.push({ players: JSON.parse(JSON.stringify(players)), ball: JSON.parse(JSON.stringify(ball)), slots: JSON.parse(JSON.stringify(slots)), drawing: dCanvas.toDataURL() });
-        document.getElementById('fCount').innerText = frames.length;
-        clearDrawing(); alert(`已紀錄影格 ${frames.length}`);
-    }
-
+    function record() { frames.push({ players: JSON.parse(JSON.stringify(players)), ball: JSON.parse(JSON.stringify(ball)), slots: JSON.parse(JSON.stringify(slots)), drawing: dCanvas.toDataURL() }); document.getElementById('fCount').innerText = frames.length; clearDrawing(); alert(`已紀錄影格 ${frames.length}`); }
     function animate() {
-        if (!isPlaying || isPaused || isWaiting) return;
-        const cur = frames[currentFrameIdx], nxt = frames[currentFrameIdx + 1];
-        if (t > 0) clearDrawing(); 
-        else if (t === 0 && cur.drawing) drawSavedLine(cur.drawing);
-
+        if (!isPlaying || isPaused || isWaiting) return; const cur = frames[currentFrameIdx], nxt = frames[currentFrameIdx + 1]; if (t > 0) clearDrawing(); else if (t === 0 && cur.drawing) drawSavedLine(cur.drawing);
         if (nxt) {
             slots.forEach((sl, i) => { sl.x = cur.slots[i].x + (nxt.slots[i].x - cur.slots[i].x) * t; sl.y = cur.slots[i].y + (nxt.slots[i].y - cur.slots[i].y) * t; });
-            players.forEach((p, i) => {
-                if (p.bindSlot !== null) {
-                    const targetSlot = slots.find(s => s.id === p.bindSlot);
-                    p.x = targetSlot.x; p.y = targetSlot.y;
-                } else {
-                    p.x = cur.players[i].x + (nxt.players[i].x - cur.players[i].x) * t;
-                    p.y = cur.players[i].y + (nxt.players[i].y - cur.players[i].y) * t;
-                }
-            });
-            ball.x = cur.ball.x + (nxt.ball.x - cur.ball.x) * t; ball.y = cur.ball.y + (nxt.ball.y - cur.ball.y) * t;
-            t += moveSpeed; render();
-            if (t >= 1) { 
-                t = 0; currentFrameIdx++; isWaiting = true; 
-                if (frames[currentFrameIdx] && frames[currentFrameIdx].drawing) drawSavedLine(frames[currentFrameIdx].drawing);
-                setTimeout(() => { isWaiting = false; animate(); }, pauseTime); 
-            } 
-            else { requestAnimationFrame(animate); }
+            players.forEach((p, i) => { if (p.bindSlot !== null) { const ts = slots.find(s => s.id === p.bindSlot); p.x = ts.x; p.y = ts.y; } else { p.x = cur.players[i].x + (nxt.players[i].x - cur.players[i].x) * t; p.y = cur.players[i].y + (nxt.players[i].y - cur.players[i].y) * t; } });
+            ball.x = cur.ball.x + (nxt.ball.x - cur.ball.x) * t; ball.y = cur.ball.y + (nxt.ball.y - cur.ball.y) * t; t += moveSpeed; render();
+            if (t >= 1) { t = 0; currentFrameIdx++; isWaiting = true; if (frames[currentFrameIdx] && frames[currentFrameIdx].drawing) drawSavedLine(frames[currentFrameIdx].drawing); setTimeout(() => { isWaiting = false; animate(); }, pauseTime); } else { requestAnimationFrame(animate); }
         } else { isPlaying = false; }
     }
 
-    function startPlay() {
-        if (frames.length < 2) return alert("請先記錄影格！");
-        isPlaying = true; isPaused = false; currentFrameIdx = 0; t = 0;
-        document.getElementById('playBarWrapper').classList.add('active');
-        animate();
-    }
-
+    function startPlay() { if (frames.length < 2) return alert("請先記錄影格！"); isPlaying = true; isPaused = false; currentFrameIdx = 0; t = 0; document.getElementById('playBarWrapper').classList.add('active'); animate(); }
     function stopAnim() { isPlaying = false; document.getElementById('playBarWrapper').classList.remove('active'); resetItems(); clearDrawing(); }
     function pauseAnim() { isPaused = !isPaused; if (!isPaused && isPlaying) animate(); }
     function resumeAnim() { if (!isPlaying) startPlay(); else { isPaused = false; animate(); } }
@@ -388,40 +297,10 @@
     function toggleFullScreen() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
     function switchMode(m) { currentMode = m; document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active')); document.getElementById(m === 'basic' ? 'tab-basic' : 'tab-advanced').classList.add('active'); resetItems(); }
 
-    async function fetchCloudData() {
-        const s = document.getElementById('sync-status'); s.innerText = "⏳ 同步中...";
-        try {
-            const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': MASTER_KEY } });
-            const result = await res.json();
-            savedTactics = result.record.tactics || []; updateTacticList(); s.innerText = "✅ 已同步";
-        } catch (e) { s.innerText = "❌ 失敗"; }
-    }
-
-    function updateTacticList() {
-        const list = document.getElementById('tacticList'); list.innerHTML = "";
-        savedTactics.forEach((t, i) => {
-            const item = document.createElement('div'); item.className = 'tactic-item';
-            item.innerHTML = `<span class="tactic-name">${t.name}</span><div class="tactic-btns"><button class="panel-btn btn-blue" style="padding:4px; width:45px;" onclick="loadTactic(${i})">載入</button><button class="panel-btn btn-red" style="padding:4px; width:45px;" onclick="deleteTactic(${i})">刪除</button></div>`;
-            list.appendChild(item);
-        });
-    }
-
-    function loadTactic(idx) { 
-        const t_data = savedTactics[idx].data; frames = JSON.parse(JSON.stringify(t_data)); 
-        document.getElementById('fCount').innerText = frames.length; 
-        players = JSON.parse(JSON.stringify(frames[0].players)); ball = JSON.parse(JSON.stringify(frames[0].ball)); slots = JSON.parse(JSON.stringify(frames[0].slots)); 
-        currentFrameIdx = 0; t = 0; clearDrawing(); render(); 
-    }
-
-    async function saveToLibrary() { 
-        const n = prompt("戰術名稱："); if(!n) return;
-        savedTactics.push({ name:n, data:JSON.parse(JSON.stringify(frames)) });
-        updateTacticList();
-        try {
-            await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY }, body: JSON.stringify({ tactics: savedTactics }) });
-            alert("已儲存至雲端"); clearFrames();
-        } catch(e) { alert("儲存失敗"); }
-    }
+    async function fetchCloudData() { const s = document.getElementById('sync-status'); s.innerText = "⏳ 同步中..."; try { const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': MASTER_KEY } }); const result = await res.json(); savedTactics = result.record.tactics || []; updateTacticList(); s.innerText = "✅ 已同步"; } catch (e) { s.innerText = "❌ 失敗"; } }
+    function updateTacticList() { const list = document.getElementById('tacticList'); list.innerHTML = ""; savedTactics.forEach((t, i) => { const item = document.createElement('div'); item.className = 'tactic-item'; item.innerHTML = `<span class="tactic-name">${t.name}</span><div class="tactic-btns"><button class="panel-btn btn-blue" style="padding:4px; width:45px;" onclick="loadTactic(${i})">載入</button><button class="panel-btn btn-red" style="padding:4px; width:45px;" onclick="deleteTactic(${i})">刪除</button></div>`; list.appendChild(item); }); }
+    function loadTactic(idx) { const t_data = savedTactics[idx].data; frames = JSON.parse(JSON.stringify(t_data)); document.getElementById('fCount').innerText = frames.length; players = JSON.parse(JSON.stringify(frames[0].players)); ball = JSON.parse(JSON.stringify(frames[0].ball)); slots = JSON.parse(JSON.stringify(frames[0].slots)); currentFrameIdx = 0; t = 0; clearDrawing(); render(); }
+    async function saveToLibrary() { const n = prompt("戰術名稱："); if(!n) return; savedTactics.push({ name:n, data:JSON.parse(JSON.stringify(frames)) }); updateTacticList(); try { await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': MASTER_KEY }, body: JSON.stringify({ tactics: savedTactics }) }); alert("已儲存至雲端"); clearFrames(); } catch(e) { alert("儲存失敗"); } }
 
     init();
 </script>
