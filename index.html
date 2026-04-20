@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>籃球戰術板 Pro - 全螢幕優化版</title>
+    <title>籃球戰術板 Pro - 平板觸控優化版</title>
     <style>
         :root { 
             --panel: rgba(25, 25, 25, 0.98); 
@@ -27,7 +27,6 @@
         #drawingCanvas { z-index: 10; pointer-events: none; }
         #drawingCanvas.active { pointer-events: auto; cursor: crosshair; }
         
-        /* 修正：自定義通知 (取代 alert 以維持全螢幕) */
         #toast {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
             background: var(--accent-blue); color: white; padding: 10px 25px;
@@ -36,7 +35,6 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        /* 語音面板視覺 */
         .voice-control-panel {
             position: absolute; min-width: 220px; max-width: 400px; height: 66px;
             background: rgba(45, 55, 72, 0.95); border-radius: 33px;
@@ -60,7 +58,6 @@
 
         @keyframes voice-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
 
-        /* 其餘控制組件樣式 */
         .sidebar { position: absolute; top: 0; height: 100%; background: var(--panel); transition: 0.3s ease; z-index: 4000; width: 260px; display: flex; flex-direction: column; }
         .sidebar-left { left: -260px; border-right: 1px solid var(--border); }
         .sidebar-right { right: -260px; border-left: 1px solid var(--border); }
@@ -172,7 +169,7 @@
     let currentMode = 'basic', lineStyle = 'solid', moveSpeed = 0.05, pauseTime = 500;
     let savedTactics = [];
 
-    // --- 語音辨識邏輯 ---
+    // --- 語音修正優化 ---
     let recognition;
     let isRecording = false;
 
@@ -193,57 +190,70 @@
 
     function toggleSpeech() {
         if (!recognition) return alert("您的瀏覽器不支援語音輸入");
-        if (isRecording) { recognition.stop(); } 
-        else { try { recognition.start(); } catch(e) { recognition.stop(); setTimeout(() => recognition.start(), 200); } }
+        // 修正點：顯式強制停止
+        if (isRecording) {
+            recognition.stop();
+        } else {
+            try {
+                recognition.start();
+            } catch(e) {
+                recognition.stop();
+                setTimeout(() => recognition.start(), 200);
+            }
+        }
     }
 
     function setupVoicePanel() {
         const panel = document.getElementById('voicePanel');
-        let startX = 0, startY = 0, offsetX = 0, offsetY = 0, isDragging = false, hasMoved = false;
+        let startX = 0, startY = 0, offsetX = 0, offsetY = 0, startTime = 0;
+        let isDragging = false, hasMoved = false;
+
         const start = (e) => { 
             const pos = e.touches ? e.touches[0] : e;
             startX = pos.clientX; startY = pos.clientY;
             offsetX = pos.clientX - panel.offsetLeft; offsetY = pos.clientY - panel.offsetTop;
+            startTime = Date.now();
             isDragging = true; hasMoved = false;
         };
         const move = (e) => {
             if (!isDragging) return;
             const pos = e.touches ? e.touches[0] : e;
-            if (Math.hypot(pos.clientX - startX, pos.clientY - startY) > 5) {
+            const dist = Math.hypot(pos.clientX - startX, pos.clientY - startY);
+            if (dist > 5) {
                 hasMoved = true;
                 panel.style.left = (pos.clientX - offsetX) + 'px';
                 panel.style.top = (pos.clientY - offsetY) + 'px';
                 panel.style.bottom = 'auto';
             }
         };
-        const end = () => { if (isDragging && !hasMoved) toggleSpeech(); isDragging = false; };
+        const end = (e) => {
+            if (isDragging) {
+                const duration = Date.now() - startTime;
+                // 修正點：若位移極小且觸碰時間短，判定為「點擊開關」，而非拖曳
+                if (!hasMoved && duration < 300) {
+                    toggleSpeech();
+                }
+            }
+            isDragging = false;
+        };
         panel.addEventListener('mousedown', start); panel.addEventListener('touchstart', start, {passive:false});
         window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, {passive:false});
         window.addEventListener('mouseup', end); window.addEventListener('touchend', end);
     }
 
-    // --- 核心修正：紀錄影格與通知邏輯 ---
     function showToast(msg) {
         const toast = document.getElementById('toast');
-        toast.innerText = msg;
-        toast.style.opacity = '1';
+        toast.innerText = msg; toast.style.opacity = '1';
         setTimeout(() => { toast.style.opacity = '0'; }, 2000);
     }
 
     function record() {
-        frames.push({ 
-            players: JSON.parse(JSON.stringify(players)), 
-            ball: JSON.parse(JSON.stringify(ball)), 
-            slots: JSON.parse(JSON.stringify(slots)), 
-            drawing: dCanvas.toDataURL() 
-        });
+        frames.push({ players: JSON.parse(JSON.stringify(players)), ball: JSON.parse(JSON.stringify(ball)), slots: JSON.parse(JSON.stringify(slots)), drawing: dCanvas.toDataURL() });
         document.getElementById('fCount').innerText = frames.length;
-        clearDrawing();
-        // 修正：使用自定義通知取代 alert，避免跳出全螢幕
-        showToast(`已紀錄第 ${frames.length} 格影格`);
+        clearDrawing(); showToast(`已紀錄第 ${frames.length} 格影格`);
     }
 
-    // --- 其餘戰術板邏輯保留 ---
+    // --- 其餘功能均保留 ---
     async function init() {
         try {
             courtImg = await loadImage("https://raw.githubusercontent.com/goodskyfly-cell/BBOARD/main/basketball%20court%202%20(NEW).png");
@@ -254,7 +264,6 @@
             initSpeech(); setupVoicePanel();
         } catch (e) { console.error(e); }
     }
-
     function loadImage(src) { return new Promise((res) => { const img = new Image(); img.crossOrigin = "anonymous"; img.src = src; img.onload = () => res(img); }); }
     function resize() { const holder = document.getElementById('canvasHolder'); const ratio = BASE_W / BASE_H; let w = holder.clientWidth, h = holder.clientHeight; if (w / h > ratio) w = h * ratio; else h = w / ratio; canvas.width = dCanvas.width = w; canvas.height = dCanvas.height = h; render(); }
     function resetItems() { players = []; for (let i = 0; i < 12; i++) players.push({ x: 80 + (i % 6) * 110, y: i < 6 ? 90 : 200, imgIndex: i, bindSlot: null }); slots = [ {x: 300, y: 480, id: 0}, {x: 400, y: 480, id: 1}, {x: 500, y: 480, id: 2}, {x: 600, y: 480, id: 3}, {x: 700, y: 480, id: 4} ]; ball = {x: 500, y: 286}; render(); }
@@ -264,28 +273,14 @@
         players.forEach(p => { const r = 25.5 * s; ctx.save(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2); ctx.clip(); if (playerImages[p.imgIndex]) ctx.drawImage(playerImages[p.imgIndex], (p.x-25.5)*s, (p.y-25.5)*s, 51*s, 51*s); ctx.restore(); ctx.beginPath(); ctx.arc(p.x * s, p.y * s, r, 0, Math.PI * 2); ctx.strokeStyle = (p.bindSlot !== null && currentMode === 'advanced') ? "#38a169" : "white"; ctx.lineWidth = 2.5; ctx.stroke(); });
         const br = 18 * s; ctx.beginPath(); ctx.arc(ball.x * s, ball.y * s, br, 0, Math.PI * 2); ctx.fillStyle = "#ff5722"; ctx.fill(); ctx.strokeStyle = "white"; ctx.lineWidth = 2; ctx.stroke();
     }
-
     function setupEvents() {
         let target = null;
         const getXY = (e) => { const rect = canvas.getBoundingClientRect(); const cx = e.touches ? e.touches[0].clientX : e.clientX; const cy = e.touches ? e.touches[0].clientY : e.clientY; const s = canvas.width / BASE_W; return { x: (cx - rect.left) / s, y: (cy - rect.top) / s }; };
         const start = (e) => { if (isPlaying) return; const pos = getXY(e); if (isDrawingMode) { dCtx.beginPath(); dCtx.moveTo(pos.x * (canvas.width/BASE_W), pos.y * (canvas.width/BASE_W)); dCtx.setLineDash(lineStyle === 'dashed' ? [10, 10] : []); dCtx.strokeStyle = "black"; dCtx.lineWidth = 4; isDrawing = true; return; } const items = currentMode === 'advanced' ? [...slots, ball, ...players] : [ball, ...players]; target = items.reverse().find(it => Math.hypot(it.x - pos.x, it.y - pos.y) < 30); };
-        const move = (e) => {
-            if (!target && !isDrawing) return; if (e.cancelable) e.preventDefault();
-            const pos = getXY(e);
-            if (isDrawingMode) { dCtx.lineTo(pos.x * (canvas.width/BASE_W), pos.y * (canvas.width/BASE_W)); dCtx.stroke(); } 
-            else { 
-                target.x = pos.x; target.y = pos.y; 
-                if (currentMode === 'advanced' && players.includes(target)) {
-                    const near = slots.find(sl => Math.hypot(sl.x - pos.x, sl.y - pos.y) < 35);
-                    if(near) { target.bindSlot = near.id; target.x = near.x; target.y = near.y; } else { target.bindSlot = null; }
-                }
-                render(); 
-            }
-        };
+        const move = (e) => { if (!target && !isDrawing) return; if (e.cancelable) e.preventDefault(); const pos = getXY(e); if (isDrawingMode) { dCtx.lineTo(pos.x * (canvas.width/BASE_W), pos.y * (canvas.width/BASE_W)); dCtx.stroke(); } else { target.x = pos.x; target.y = pos.y; if (currentMode === 'advanced' && players.includes(target)) { const near = slots.find(sl => Math.hypot(sl.x - pos.x, sl.y - pos.y) < 35); if(near) { target.bindSlot = near.id; target.x = near.x; target.y = near.y; } else { target.bindSlot = null; } } render(); } };
         const end = () => { target = null; isDrawing = false; };
         const el = document.getElementById('canvasHolder'); el.addEventListener('mousedown', start); window.addEventListener('mousemove', move); window.addEventListener('mouseup', end); el.addEventListener('touchstart', start, {passive:false}); window.addEventListener('touchmove', move, {passive:false}); window.addEventListener('touchend', end);
     }
-
     function animate() {
         if (!isPlaying || isPaused || isWaiting) return; const cur = frames[currentFrameIdx], nxt = frames[currentFrameIdx + 1]; if (t > 0) clearDrawing(); else if (t === 0 && cur.drawing) drawSavedLine(cur.drawing);
         if (nxt) {
