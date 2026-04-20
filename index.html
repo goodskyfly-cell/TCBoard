@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>籃球戰術板 Pro - 平板權限修正版</title>
+    <title>籃球戰術板 Pro - 平板硬體優化版</title>
     <style>
         :root { 
             --panel: rgba(25, 25, 25, 0.98); 
@@ -170,10 +170,10 @@
     let currentMode = 'basic', lineStyle = 'solid', moveSpeed = 0.05, pauseTime = 500;
     let savedTactics = [];
 
-    // --- 針對平板環境的顯性語音激活邏輯 ---
+    // --- 平板硬體優化語音模組 ---
     let recognition = null;
     let isRecording = false;
-    let clickLock = false;
+    let actionLock = false;
 
     async function initSpeech() {
         if (recognition) {
@@ -181,13 +181,12 @@
             recognition = null;
         }
 
-        // 強制向系統請求麥克風權限並建立音訊上下文
+        // 強制激發硬體通道 (針對平板 Chrome 無法自動選取外接設備的問題)
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // 確認獲得權限後立即釋放，將通道交由 WebSpeech 使用
-            stream.getTracks().forEach(t => t.stop()); 
+            stream.getTracks().forEach(track => track.stop()); // 授權後釋放，交還給 WebSpeech
         } catch (e) {
-            alert("瀏覽器無法存取麥克風。請至系統設定檢查「網站權限」是否已開啟。");
+            alert("Chrome 拒絕存取麥克風，請點擊網址列左側圖示允許權限。");
             return;
         }
 
@@ -213,11 +212,11 @@
             document.getElementById('voiceText').innerText = interimTranscript;
         };
 
-        recognition.onend = () => { resetVoiceUI(); };
-        recognition.onerror = (e) => { console.error(e); resetVoiceUI(); };
+        recognition.onend = () => { shutDownVoiceUI(); };
+        recognition.onerror = (e) => { console.error(e); shutDownVoiceUI(); };
     }
 
-    function resetVoiceUI() {
+    function shutDownVoiceUI() {
         isRecording = false;
         document.getElementById('voicePanel').classList.remove('recording'); 
         if(document.getElementById('voiceText').innerText === "辨識中...") {
@@ -227,23 +226,23 @@
     }
 
     async function toggleSpeech() {
-        if (clickLock) return;
-        clickLock = true;
-        setTimeout(() => { clickLock = false; }, 400);
+        if (actionLock) return;
+        actionLock = true;
+        setTimeout(() => { actionLock = false; }, 500);
 
         if (isRecording) {
             if (recognition) {
                 recognition.stop();
-                recognition.abort();
+                recognition.abort(); // 強制中止連線
             }
-            resetVoiceUI();
+            shutDownVoiceUI();
         } else {
             await initSpeech();
             if (!recognition) return;
             try {
                 recognition.start();
             } catch(e) {
-                resetVoiceUI();
+                shutDownVoiceUI();
             }
         }
     }
@@ -264,7 +263,7 @@
             if (!isDragging) return;
             const pos = e.touches ? e.touches[0] : e;
             const dist = Math.hypot(pos.clientX - startX, pos.clientY - startY);
-            if (dist > 8) {
+            if (dist > 10) {
                 moved = true;
                 panel.style.left = (pos.clientX - offsetX) + 'px';
                 panel.style.top = (pos.clientY - offsetY) + 'px';
@@ -284,7 +283,7 @@
         window.addEventListener('mouseup', end); window.addEventListener('touchend', end);
     }
 
-    // --- 其餘功能均完整保留 ---
+    // --- 其餘功能保留 ---
     function showToast(msg) {
         const toast = document.getElementById('toast');
         toast.innerText = msg; toast.style.opacity = '1';
