@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>籃球戰術板 Pro - 平板音訊修正版</title>
+    <title>籃球戰術板 Pro - 平板權限修正版</title>
     <style>
         :root { 
             --panel: rgba(25, 25, 25, 0.98); 
@@ -170,10 +170,10 @@
     let currentMode = 'basic', lineStyle = 'solid', moveSpeed = 0.05, pauseTime = 500;
     let savedTactics = [];
 
-    // --- 強化版語音模組：解決平板不收音與無法關閉問題 ---
+    // --- 針對平板環境的顯性語音激活邏輯 ---
     let recognition = null;
     let isRecording = false;
-    let isLock = false;
+    let clickLock = false;
 
     async function initSpeech() {
         if (recognition) {
@@ -181,12 +181,13 @@
             recognition = null;
         }
 
-        // 強制請求麥克風權限 (解決平板收音通道未開啟問題)
+        // 強制向系統請求麥克風權限並建立音訊上下文
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(track => track.stop()); // 僅確認權限，隨即釋放
+            // 確認獲得權限後立即釋放，將通道交由 WebSpeech 使用
+            stream.getTracks().forEach(t => t.stop()); 
         } catch (e) {
-            alert("無法開啟麥克風，請檢查平板權限設定。");
+            alert("瀏覽器無法存取麥克風。請至系統設定檢查「網站權限」是否已開啟。");
             return;
         }
 
@@ -212,46 +213,37 @@
             document.getElementById('voiceText').innerText = interimTranscript;
         };
 
-        recognition.onend = () => { 
-            forceStopUI();
-        };
-
-        recognition.onerror = (e) => { 
-            console.error("Speech Error:", e.error);
-            forceStopUI();
-        };
+        recognition.onend = () => { resetVoiceUI(); };
+        recognition.onerror = (e) => { console.error(e); resetVoiceUI(); };
     }
 
-    // 強制關閉 UI 與狀態 (解決圖案卡死問題)
-    function forceStopUI() {
+    function resetVoiceUI() {
         isRecording = false;
-        const panel = document.getElementById('voicePanel');
-        const text = document.getElementById('voiceText');
-        panel.classList.remove('recording'); 
-        if(text.innerText === "辨識中...") text.innerText = "點擊語音輸入...";
+        document.getElementById('voicePanel').classList.remove('recording'); 
+        if(document.getElementById('voiceText').innerText === "辨識中...") {
+            document.getElementById('voiceText').innerText = "點擊語音輸入..."; 
+        }
+        recognition = null;
     }
 
     async function toggleSpeech() {
-        if (isLock) return;
-        isLock = true;
-        setTimeout(() => { isLock = false; }, 500);
+        if (clickLock) return;
+        clickLock = true;
+        setTimeout(() => { clickLock = false; }, 400);
 
         if (isRecording) {
-            // 雙重關閉指令
             if (recognition) {
                 recognition.stop();
                 recognition.abort();
             }
-            forceStopUI();
-            recognition = null;
+            resetVoiceUI();
         } else {
             await initSpeech();
             if (!recognition) return;
             try {
                 recognition.start();
             } catch(e) {
-                forceStopUI();
-                recognition = null;
+                resetVoiceUI();
             }
         }
     }
@@ -272,7 +264,7 @@
             if (!isDragging) return;
             const pos = e.touches ? e.touches[0] : e;
             const dist = Math.hypot(pos.clientX - startX, pos.clientY - startY);
-            if (dist > 5) {
+            if (dist > 8) {
                 moved = true;
                 panel.style.left = (pos.clientX - offsetX) + 'px';
                 panel.style.top = (pos.clientY - offsetY) + 'px';
@@ -282,9 +274,7 @@
         const end = (e) => {
             if (isDragging) {
                 const duration = Date.now() - startTime;
-                if (!moved && duration < 350) {
-                    toggleSpeech();
-                }
+                if (!moved && duration < 350) toggleSpeech();
             }
             isDragging = false;
         };
@@ -294,7 +284,7 @@
         window.addEventListener('mouseup', end); window.addEventListener('touchend', end);
     }
 
-    // --- 其餘功能保留 ---
+    // --- 其餘功能均完整保留 ---
     function showToast(msg) {
         const toast = document.getElementById('toast');
         toast.innerText = msg; toast.style.opacity = '1';
