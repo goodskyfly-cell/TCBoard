@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>籃球戰術板 Pro - 平板觸控優化版</title>
+    <title>籃球戰術板 Pro - 語音開關優化版</title>
     <style>
         :root { 
             --panel: rgba(25, 25, 25, 0.98); 
@@ -169,30 +169,57 @@
     let currentMode = 'basic', lineStyle = 'solid', moveSpeed = 0.05, pauseTime = 500;
     let savedTactics = [];
 
-    // --- 語音修正優化 ---
+    // --- 語音開關修正專用變數 ---
     let recognition;
     let isRecording = false;
+    let lastToggleTime = 0; // 防抖動冷卻鎖
 
     function initSpeech() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
         if (!SpeechRecognition) return;
         recognition = new SpeechRecognition();
-        recognition.lang = 'zh-TW'; recognition.continuous = true; recognition.interimResults = true; 
-        recognition.onstart = () => { isRecording = true; document.getElementById('voicePanel').classList.add('recording'); document.getElementById('voiceText').innerText = "辨識中..."; };
+        recognition.lang = 'zh-TW'; 
+        recognition.continuous = true; 
+        recognition.interimResults = true; 
+        
+        recognition.onstart = () => { 
+            isRecording = true; 
+            document.getElementById('voicePanel').classList.add('recording'); 
+            document.getElementById('voiceText').innerText = "辨識中..."; 
+        };
         recognition.onresult = (e) => {
             let interimTranscript = '';
-            for (let i = e.resultIndex; i < e.results.length; ++i) { interimTranscript += e.results[i][0].transcript; }
+            for (let i = e.resultIndex; i < e.results.length; ++i) { 
+                interimTranscript += e.results[i][0].transcript; 
+            }
             document.getElementById('voiceText').innerText = interimTranscript;
         };
-        recognition.onend = () => { isRecording = false; document.getElementById('voicePanel').classList.remove('recording'); if(document.getElementById('voiceText').innerText === "辨識中...") document.getElementById('voiceText').innerText = "點擊語音輸入..."; };
-        recognition.onerror = () => { isRecording = false; document.getElementById('voicePanel').classList.remove('recording'); };
+        recognition.onend = () => { 
+            isRecording = false; 
+            document.getElementById('voicePanel').classList.remove('recording'); 
+            if(document.getElementById('voiceText').innerText === "辨識中...") {
+                document.getElementById('voiceText').innerText = "點擊語音輸入..."; 
+            }
+        };
+        recognition.onerror = () => { 
+            isRecording = false; 
+            document.getElementById('voicePanel').classList.remove('recording'); 
+        };
     }
 
     function toggleSpeech() {
+        const now = Date.now();
+        // 修正點：防抖動冷卻鎖 (300ms 內禁止連續觸發)
+        if (now - lastToggleTime < 300) return;
+        lastToggleTime = now;
+
         if (!recognition) return alert("您的瀏覽器不支援語音輸入");
-        // 修正點：顯式強制停止
+
         if (isRecording) {
+            // 修正點：強制停止並重置視覺
             recognition.stop();
+            isRecording = false;
+            document.getElementById('voicePanel').classList.remove('recording');
         } else {
             try {
                 recognition.start();
@@ -219,6 +246,7 @@
             if (!isDragging) return;
             const pos = e.touches ? e.touches[0] : e;
             const dist = Math.hypot(pos.clientX - startX, pos.clientY - startY);
+            // 修正點：明確位移門檻
             if (dist > 5) {
                 hasMoved = true;
                 panel.style.left = (pos.clientX - offsetX) + 'px';
@@ -229,13 +257,14 @@
         const end = (e) => {
             if (isDragging) {
                 const duration = Date.now() - startTime;
-                // 修正點：若位移極小且觸碰時間短，判定為「點擊開關」，而非拖曳
-                if (!hasMoved && duration < 300) {
+                // 修正點：只有在沒顯著移動且短觸碰的情況下判定為點擊
+                if (!hasMoved && duration < 350) {
                     toggleSpeech();
                 }
             }
             isDragging = false;
         };
+
         panel.addEventListener('mousedown', start); panel.addEventListener('touchstart', start, {passive:false});
         window.addEventListener('mousemove', move); window.addEventListener('touchmove', move, {passive:false});
         window.addEventListener('mouseup', end); window.addEventListener('touchend', end);
@@ -253,7 +282,6 @@
         clearDrawing(); showToast(`已紀錄第 ${frames.length} 格影格`);
     }
 
-    // --- 其餘功能均保留 ---
     async function init() {
         try {
             courtImg = await loadImage("https://raw.githubusercontent.com/goodskyfly-cell/BBOARD/main/basketball%20court%202%20(NEW).png");
